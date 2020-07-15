@@ -1633,7 +1633,6 @@ def formatTimeColumns(data, timeColumnNames):
 
 
 def strip_tag(tag):
-    strip_ns_tag = tag
     split_array = tag.split('}')
     if len(split_array) > 1:
         strip_ns_tag = split_array[1]
@@ -2313,6 +2312,9 @@ class Common(object):
         :type positive_detections: ``int``
         :param positive_detections: The number of engines that positively detected the indicator as malicious.
 
+        :type category: ``str``
+        :param category: The category associated with the indicator.
+
         :type dbot_score: ``DBotScore``
         :param dbot_score: If URL has reputation then create DBotScore object
 
@@ -2321,10 +2323,11 @@ class Common(object):
         """
         CONTEXT_PATH = 'URL(val.Data && val.Data == obj.Data)'
 
-        def __init__(self, url, dbot_score, detection_engines=None, positive_detections=None):
+        def __init__(self, url, dbot_score, detection_engines=None, positive_detections=None, category=None):
             self.url = url
             self.detection_engines = detection_engines
             self.positive_detections = positive_detections
+            self.category = category
 
             self.dbot_score = dbot_score
 
@@ -2338,6 +2341,9 @@ class Common(object):
 
             if self.positive_detections:
                 url_context['PositiveDetections'] = self.positive_detections
+
+            if self.category:
+                url_context['Category'] = self.category
 
             if self.dbot_score and self.dbot_score.score == Common.DBotScore.BAD:
                 url_context['Malicious'] = {
@@ -3588,7 +3594,8 @@ if 'requests' in sys.modules:
         def _http_request(self, method, url_suffix, full_url=None, headers=None, auth=None, json_data=None,
                           params=None, data=None, files=None, timeout=10, resp_type='json', ok_codes=None,
                           return_empty_response=False, retries=0, status_list_to_retry=None,
-                          backoff_factor=5, raise_on_redirect=False, raise_on_status=False, **kwargs):
+                          backoff_factor=5, raise_on_redirect=False, raise_on_status=False,
+                          error_handler=None, **kwargs):
             """A wrapper for requests lib to send our requests and handle requests and responses better.
 
             :type method: ``str``
@@ -3675,6 +3682,10 @@ if 'requests' in sys.modules:
                 whether we should raise an exception, or return a response,
                 if status falls in ``status_forcelist`` range and retries have
                 been exhausted.
+
+            :type error_handler ``callable``
+            :param error_handler: Given an error entery, the error handler outputs the
+                new formatted error message.
             """
             try:
                 # Replace params if supplied
@@ -3698,16 +3709,19 @@ if 'requests' in sys.modules:
                 )
                 # Handle error responses gracefully
                 if not self._is_status_code_valid(res, ok_codes):
-                    err_msg = 'Error in API call [{}] - {}' \
-                        .format(res.status_code, res.reason)
-                    try:
-                        # Try to parse json error response
-                        error_entry = res.json()
-                        err_msg += '\n{}'.format(json.dumps(error_entry))
-                        raise DemistoException(err_msg)
-                    except ValueError:
-                        err_msg += '\n{}'.format(res.text)
-                        raise DemistoException(err_msg)
+                    if error_handler:
+                        error_handler(res)
+                    else:
+                        err_msg = 'Error in API call [{}] - {}' \
+                            .format(res.status_code, res.reason)
+                        try:
+                            # Try to parse json error response
+                            error_entry = res.json()
+                            err_msg += '\n{}'.format(json.dumps(error_entry))
+                            raise DemistoException(err_msg)
+                        except ValueError:
+                            err_msg += '\n{}'.format(res.text)
+                            raise DemistoException(err_msg)
 
                 is_response_empty_and_successful = (res.status_code == 204)
                 if is_response_empty_and_successful and return_empty_response:
