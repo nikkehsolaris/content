@@ -73,7 +73,7 @@ name: Mail Listener v2
 script:
   commands:
   - deprecated: false
-    description: Fetches mail according to the configuration
+    description: Fetches mails according to the configuration
     execution: false
     name: mail-listener-list-messages
     outputs:
@@ -155,7 +155,7 @@ script:
   subtype: python3
   type: python
 tests:
-- No tests
+- Mail-Listener Test Playbook
 defaultmapperin: mail-listener-mapper
 defaultclassifier: mail-listener
 fromversion: 5.0.0
